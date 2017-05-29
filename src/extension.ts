@@ -1,113 +1,208 @@
-'use strict';
-import * as vscode from 'vscode';
+'use strict'
+import * as vscode from 'vscode'
 import * as request from './request-light/main'
+import * as opn from 'opn'
+
+const cmdListGitHubNotifications: string = 'github-notifications.list'
 
 export function activate(context: vscode.ExtensionContext) {
-    let notification = new Notification()
-    let controller = new NotificationController(notification);
+    let notifications = new Notifications()
+    let controller = new Controller(notifications)
 
-    context.subscriptions.push(notification);
-    context.subscriptions.push(controller);
+    context.subscriptions.push(notifications)
+    context.subscriptions.push(controller)
+
+    let disposable = vscode.commands.registerCommand(cmdListGitHubNotifications, () => {
+        notifications.list()
+    })
+
+    context.subscriptions.push(disposable)
 }
 
 export function deactivate() {
 }
 
-class NotificationController {
-    private notification: Notification;
-    private disposable: vscode.Disposable;
+class Controller {
+    private notifications: Notifications
+    private disposable: vscode.Disposable
 
-    constructor(_notification: Notification) {
-        this.notification = _notification;
+    constructor(_notifications: Notifications) {
+        this.notifications = _notifications
 
-        let subscriptions: vscode.Disposable[] = [];
-        vscode.workspace.onDidChangeConfiguration(this.onChangedConfiguration, this, subscriptions)
+        let subscriptions: vscode.Disposable[] = []
+        vscode.workspace.onDidChangeConfiguration(this.onDidChangeConfiguration, this, subscriptions)
 
-        this.disposable = vscode.Disposable.from(...subscriptions);
+        this.disposable = vscode.Disposable.from(...subscriptions)
     }
 
     dispose() {
-        this.disposable.dispose();
+        this.disposable.dispose()
     }
 
-    private onChangedConfiguration() {
-        this.notification.setup()
+    private onDidChangeConfiguration() {
+        this.notifications.setup()
     }
 }
 
-class Notification {
-    private statusBarItem: vscode.StatusBarItem;
-
-    private githubUsername: string
-    private githubPassword: string
-
-    private httpProxy: string
-    private httpProxyStrictSSL: boolean
+class Notifications {
+    private statusBarItem: vscode.StatusBarItem
+    private xhrOptions: request.XHROptions | null
+    private timerId: NodeJS.Timer
+    private commands: Map<vscode.QuickPickItem, string>
 
     constructor() {
         if (!this.statusBarItem) {
-            this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+            this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right)
+            this.statusBarItem.command = cmdListGitHubNotifications
+            this.statusBarItem.text = "$(mark-github)"
         }
+        this.timerId = null
+
         this.setup()
-        this.update()
     }
 
     setup() {
         console.log("Notification.setup")
 
         const githubNotificationConfiguration = vscode.workspace.getConfiguration("githubNotification")
-
-        this.githubUsername = githubNotificationConfiguration.get<string>("username", "")
-        this.githubPassword = githubNotificationConfiguration.get<string>("password", "")
-
         const httpConfiguration = vscode.workspace.getConfiguration("http")
 
-        this.httpProxy = httpConfiguration.get<string>("proxy", "")
-        this.httpProxyStrictSSL = httpConfiguration.get<boolean>("proxyStrictSSL", false)
-    }
+        const githubUsername = githubNotificationConfiguration.get<string>("username", "")
+        const githubPassword = githubNotificationConfiguration.get<string>("password", "")
 
-    update() {
-        console.log("Notification.update")
+        const httpProxy = httpConfiguration.get<string>("proxy", "")
+        const httpProxyStrictSSL = httpConfiguration.get<boolean>("proxyStrictSSL", false)
 
-        if (this.githubUsername == "" || this.githubPassword == "") {
-            this.statusBarItem.hide()
-            return
+        request.configure(httpProxy, httpProxyStrictSSL)
+
+        if (githubUsername != "" && githubPassword != "") {
+            this.xhrOptions = {
+                type: "GET",
+                url: "https://api.github.com/notifications",
+                user: githubUsername,
+                password: githubPassword,
+                headers: {
+                    "User-Agent": "github-notifications"
+                }
+            }
+        } else {
+            this.xhrOptions = null
         }
 
-        request.configure(this.httpProxy, this.httpProxyStrictSSL)
+        if (this.timerId != null) {
+            clearTimeout(this.timerId)
+            this.timerId = null
+        }
 
-        console.log(Date.now())
-        console.log(this.githubUsername)
-        console.log(this.githubPassword)
+        this.check()
+    }
 
-        let response = request.xhr({
-            type: "GET",
-            url: "https://api.github.com/notifications",
-            user: this.githubUsername,
-            password: this.githubPassword,
-            headers: {
-                "User-Agent": "github-notifications"
+    open(r: request.XHRResponse) {
+        console.log("Notification.open")
+
+        let comment = JSON.parse(r.responseText)
+        let html_url = comment.html_url
+        if (html_url !== undefined) {
+            opn(html_url)
+        }
+    }
+
+    list() {
+        console.log("Notification.list")
+
+        if (this.commands.size > 0) {
+            let commands: vscode.QuickPickItem[] = []
+            for (let command of this.commands.keys()) {
+                commands.push(command)
             }
-        })
+            commands = commands.sort()
 
-        response.then((r) => {
-            let interval = r.responseHeader["x-poll-interval"] * 1000
+            vscode.window.showQuickPick(commands)
+                .then((r) => {
+                    let latest_comment_url: string = this.commands.get(r)
+                    if (latest_comment_url !== undefined && this.xhrOptions != null) {
+                        let xhrOptions = {
+                            type: "GET",
+                            url: latest_comment_url,
+                            user: this.xhrOptions.user,
+                            password: this.xhrOptions.password,
+                            headers: {
+                                "User-Agent": "github-notifications"
+                            }
+                        }
 
-            console.log(r.status)
-            console.log(JSON.parse(r.responseText))
+                        request.xhr(xhrOptions)
+                            .then((r) => {
+                                this.open(r)
+                            })
+                            .catch((e) => {
+                                console.log(e)
+                            })
+                    }
+                })
+        }
+    }
 
-            this.statusBarItem.text = "" + Date.now()
-            this.statusBarItem.show();
+    check() {
+        console.log("Notification.check")
 
-            setTimeout(() => { this.update() }, interval)
-        }).catch((e) => {
-            //     this._statusBarItem.hide();
-            console.log(e)
-        })
+        if (this.xhrOptions != null) {
+            request.xhr(this.xhrOptions)
+                .then((r) => {
+                    this.update(r)
+                }).catch((e) => {
+                    this.error(e)
+                })
+        }
+        else {
+            this.statusBarItem.hide()
+        }
+    }
+
+    update(r: request.XHRResponse) {
+        console.log("Notification.update")
+        const interval = r.responseHeader["x-poll-interval"] * 1000
+        const threads = JSON.parse(r.responseText)
+
+        let commands = new Map<vscode.QuickPickItem, string>()
+        for (let thread of threads) {
+            let repository_full_name: string = thread.repository.full_name
+            let subject_type: string = thread.subject.type
+            let subject_title: string = thread.subject.title
+            let subject_comment_url: string = thread.subject.latest_comment_url
+
+            let command: vscode.QuickPickItem = {
+                label: subject_title,
+                description: subject_type + " " + repository_full_name,
+            }
+
+            if (!commands.has(command)) {
+                commands.set(command, subject_comment_url)
+            }
+        }
+
+        if (commands.size > 0) {
+            this.statusBarItem.show()
+        }
+        else {
+            this.statusBarItem.hide()
+        }
+
+        this.commands = commands
+        this.timerId = setTimeout(() => { this.check() }, interval)
+    }
+
+    error(e: any) {
+        console.log("Notification.error")
+        const interval = 5 * 1000
+
+        console.log(e)
+
+        this.timerId = setTimeout(() => { this.check() }, interval)
     }
 
     dispose() {
         console.log("Notification.dispose")
-        this.statusBarItem.dispose();
+        this.statusBarItem.dispose()
     }
 }
