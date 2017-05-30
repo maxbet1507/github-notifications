@@ -4,6 +4,7 @@
     "description": "GitHub Notifications for Visual Studio Code",
     "version": "0.0.1",
     "publisher": "maxbet1507",
+    "icon": "icon.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/maxbet1507/github-notifications.git"
