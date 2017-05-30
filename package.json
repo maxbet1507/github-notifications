@@ -1,7 +1,7 @@
 {
     "name": "github-notifications",
-    "displayName": "github-notifications",
-    "description": "",
+    "displayName": "GitHub Notifications",
+    "description": "GitHub Notifications for Visual Studio Code",
     "version": "0.0.1",
     "publisher": "maxbet1507",
     "repository": {
@@ -27,7 +27,7 @@
             }
         ],
         "configuration": {
-            "title": "github-notification configuration",
+            "title": "GitHub Notifications Configuration",
             "properties": {
                 "githubNotification.username": {
                     "type": "string",
@@ -37,7 +37,12 @@
                 "githubNotification.password": {
                     "type": "string",
                     "default": "",
-                    "description": "Your GitHub password for API authentication."
+                    "description": "Your GitHub password or token for API authentication."
+                },
+                "githubNotification.url": {
+                    "type": "string",
+                    "default": "https://api.github.com/notifications",
+                    "description": "GitHub REST API v3 URL."
                 }
             }
         }

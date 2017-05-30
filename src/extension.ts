@@ -54,7 +54,7 @@ class Notifications {
         if (!this.statusBarItem) {
             this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right)
             this.statusBarItem.command = cmdListGitHubNotifications
-            this.statusBarItem.text = "$(mark-github)"
+            this.statusBarItem.text = "$(bell)"
         }
         this.timerId = null
 
@@ -62,13 +62,12 @@ class Notifications {
     }
 
     setup() {
-        console.log("Notification.setup")
-
         const githubNotificationConfiguration = vscode.workspace.getConfiguration("githubNotification")
         const httpConfiguration = vscode.workspace.getConfiguration("http")
 
-        const githubUsername = githubNotificationConfiguration.get<string>("username", "")
-        const githubPassword = githubNotificationConfiguration.get<string>("password", "")
+        const githubUsername = githubNotificationConfiguration.get<string>("username")
+        const githubPassword = githubNotificationConfiguration.get<string>("password")
+        const githubUrl = githubNotificationConfiguration.get<string>("url")
 
         const httpProxy = httpConfiguration.get<string>("proxy", "")
         const httpProxyStrictSSL = httpConfiguration.get<boolean>("proxyStrictSSL", false)
@@ -78,7 +77,7 @@ class Notifications {
         if (githubUsername != "" && githubPassword != "") {
             this.xhrOptions = {
                 type: "GET",
-                url: "https://api.github.com/notifications",
+                url: githubUrl,
                 user: githubUsername,
                 password: githubPassword,
                 headers: {
@@ -98,8 +97,6 @@ class Notifications {
     }
 
     open(r: request.XHRResponse) {
-        console.log("Notification.open")
-
         let comment = JSON.parse(r.responseText)
         let html_url = comment.html_url
         if (html_url !== undefined) {
@@ -108,8 +105,6 @@ class Notifications {
     }
 
     list() {
-        console.log("Notification.list")
-
         if (this.commands.size > 0) {
             let commands: vscode.QuickPickItem[] = []
             for (let command of this.commands.keys()) {
@@ -126,9 +121,7 @@ class Notifications {
                             url: latest_comment_url,
                             user: this.xhrOptions.user,
                             password: this.xhrOptions.password,
-                            headers: {
-                                "User-Agent": "github-notifications"
-                            }
+                            headers: this.xhrOptions.headers,
                         }
 
                         request.xhr(xhrOptions)
@@ -144,9 +137,8 @@ class Notifications {
     }
 
     check() {
-        console.log("Notification.check")
-
         if (this.xhrOptions != null) {
+            this.statusBarItem.show()
             request.xhr(this.xhrOptions)
                 .then((r) => {
                     this.update(r)
@@ -160,9 +152,31 @@ class Notifications {
     }
 
     update(r: request.XHRResponse) {
-        console.log("Notification.update")
         const interval = r.responseHeader["x-poll-interval"] * 1000
         const threads = JSON.parse(r.responseText)
+
+        // const threads = [
+        //     {
+        //         repository: {
+        //             full_name: "maxbet1507/github-notifications"
+        //         },
+        //         subject: {
+        //             title: "Test Pull-Request",
+        //             type: "PullRequest",
+        //             latest_comment_url: "",
+        //         }
+        //     },
+        //     {
+        //         repository: {
+        //             full_name: "maxbet1507/github-notifications"
+        //         },
+        //         subject: {
+        //             title: "Test Issue",
+        //             type: "Issue",
+        //             latest_comment_url: "",
+        //         }
+        //     }
+        // ]
 
         let commands = new Map<vscode.QuickPickItem, string>()
         for (let thread of threads) {
@@ -173,7 +187,18 @@ class Notifications {
 
             let command: vscode.QuickPickItem = {
                 label: subject_title,
-                description: subject_type + " " + repository_full_name,
+                description: repository_full_name,
+            }
+
+            switch (subject_type.toLowerCase()) {
+                case "issue":
+                    command.label = "$(issue-opened) " + command.label
+                    break
+                case "pullrequest":
+                    command.label = "$(git-pull-request) " + command.label
+                    break
+                default:
+                    command.label = "$(mark-github) " + command.label
             }
 
             if (!commands.has(command)) {
@@ -182,18 +207,20 @@ class Notifications {
         }
 
         if (commands.size > 0) {
-            this.statusBarItem.show()
+            this.statusBarItem.text = "$(bell) " + commands.size
         }
         else {
-            this.statusBarItem.hide()
+            this.statusBarItem.text = "$(bell)"
         }
+        this.statusBarItem.tooltip = "Last checked: " + r.responseHeader["date"]
+
+        console.log(r)
 
         this.commands = commands
         this.timerId = setTimeout(() => { this.check() }, interval)
     }
 
     error(e: any) {
-        console.log("Notification.error")
         const interval = 5 * 1000
 
         console.log(e)
@@ -202,7 +229,6 @@ class Notifications {
     }
 
     dispose() {
-        console.log("Notification.dispose")
         this.statusBarItem.dispose()
     }
 }
