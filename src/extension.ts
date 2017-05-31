@@ -191,8 +191,6 @@ class Notifications {
         }
         this.statusBarItem.tooltip = "Last checked: " + r.responseHeader["date"]
 
-        console.log(r)
-
         this.commands = commands
         this.timerId = setTimeout(() => { this.check() }, interval)
     }
