@@ -189,7 +189,7 @@ class Notifications {
         else {
             this.statusBarItem.text = "$(bell)"
         }
-        this.statusBarItem.tooltip = "Last checked: " + r.responseHeader["date"]
+        this.statusBarItem.tooltip = "Last checked: " + new Date(r.responseHeader["date"]).toLocaleTimeString()
 
         this.commands = commands
         this.timerId = setTimeout(() => { this.check() }, interval)
