@@ -155,29 +155,6 @@ class Notifications {
         const interval = r.responseHeader["x-poll-interval"] * 1000
         const threads = JSON.parse(r.responseText)
 
-        // const threads = [
-        //     {
-        //         repository: {
-        //             full_name: "maxbet1507/github-notifications"
-        //         },
-        //         subject: {
-        //             title: "Test Pull-Request",
-        //             type: "PullRequest",
-        //             latest_comment_url: "",
-        //         }
-        //     },
-        //     {
-        //         repository: {
-        //             full_name: "maxbet1507/github-notifications"
-        //         },
-        //         subject: {
-        //             title: "Test Issue",
-        //             type: "Issue",
-        //             latest_comment_url: "",
-        //         }
-        //     }
-        // ]
-
         let commands = new Map<vscode.QuickPickItem, string>()
         for (let thread of threads) {
             let repository_full_name: string = thread.repository.full_name
