@@ -160,6 +160,7 @@ class Notifications {
             let repository_full_name: string = thread.repository.full_name
             let subject_type: string = thread.subject.type
             let subject_title: string = thread.subject.title
+            let subject_url: string = thread.subject.url
             let subject_comment_url: string = thread.subject.latest_comment_url
 
             let command: vscode.QuickPickItem = {
@@ -179,7 +180,11 @@ class Notifications {
             }
 
             if (!commands.has(command)) {
-                commands.set(command, subject_comment_url)
+                if (subject_comment_url != null && subject_comment_url !== "") {
+                    commands.set(command, subject_comment_url)
+                } else {
+                    commands.set(command, subject_url)
+                }
             }
         }
 
