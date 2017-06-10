@@ -31,3 +31,10 @@ Required your GitHub username and password settings.
     "githubNotification.password": "xxxx",
 }
 ```
+
+## Release Notes
+
+### 0.0.3
+
+* Fixed subject.latest_comment_url is null.
+  open subject.url insteadof subject.latest_comment_url.
