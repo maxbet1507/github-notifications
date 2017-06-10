@@ -2,7 +2,7 @@
     "name": "github-notifications",
     "displayName": "GitHub Notifications",
     "description": "GitHub Notifications for Visual Studio Code",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "publisher": "maxbet1507",
     "icon": "icon.svg",
     "repository": {
