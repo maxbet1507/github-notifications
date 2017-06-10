@@ -36,5 +36,5 @@ Required your GitHub username and password settings.
 
 ### 0.0.3
 
-* Fixed subject.latest_comment_url is null.
-  open subject.url insteadof subject.latest_comment_url.
+* Fixed problem cannot open web page directly when subject.latest_comment_url is null,
+  use subject.url instead of subject.latest_comment_url.
